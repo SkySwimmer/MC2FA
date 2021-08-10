@@ -1,0 +1,15 @@
+# Gradle files
+.gradle
+
+# Build
+build
+
+# Eclipse
+*.launch
+bin
+.settings
+.classpath
+.project
+
+# Run
+run

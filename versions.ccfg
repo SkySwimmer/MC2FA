@@ -1,0 +1,34 @@
+# Version Document
+
+group> 'servertools'
+modid> 'mc2fa'
+
+# Channel names
+channels> {
+
+    @default> testing
+    
+    #stable> stable
+    #latest> latest
+    testing> testing
+    
+}
+
+# Chanel configuration
+channelFiles> {
+
+    @fallback> {
+        urls> {
+            @fallback> 'https://aerialworks.ddns.net/maven/org/asf/mods/MC2FA/%v/MC2FA-%v.cmf'
+        }
+    }
+
+    testing> {
+        versions> {
+            1.16.5> '1.0.0.A1-1.16.5'
+            1.17> '1.0.0.A1-1.17'
+            1.17.1> '1.0.0.A1-1.17.1'
+        }
+    }
+
+}
