@@ -25,7 +25,7 @@ apply from: 'asf.mvn.publish.gradle'
 
 // Project information
 group="org.asf.mods"
-version="1.0.0.A2"
+version="1.0.0.A5"
 
 // Automatically assigned
 def mod_id = "mc2fa"
@@ -253,6 +253,9 @@ cmf {
 			// To avoid a ClassNoDefError with optional dependencies, you can use the ModProvider<ModInstance> type.
 			// The ModProvider interface uses type erasure to work around this potential issue.
 			//
+			
+			// Auto-updater
+            updateserver "https://aerialworks.ddns.net/cyan/trust/download"
 		}
 	}
 
