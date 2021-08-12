@@ -226,6 +226,9 @@ cmf {
 			// Sets the remote dependencies
 			maven_dependency remoteDependencies
 
+			// Sets the game version
+			game_version gameVersion.replace(".", "\\."), "only " + gameVersion
+
 			//
 			// Add dependencies like this:
 			// dependency 'modgroup:modid', '>=greater-than-version'
