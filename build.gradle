@@ -25,7 +25,7 @@ apply from: 'asf.mvn.publish.gradle'
 
 // Project information
 group="org.asf.mods"
-version="1.0.0.A11"
+version="1.0.0.A12"
 
 // Automatically assigned
 def mod_id = "mc2fa"
@@ -36,7 +36,7 @@ def mod_group = "servertools"
 def gameVersion = "1.17.1"
 def cyanVersion = "1.0.0.A14"
 def modkitVersion = "1.2"
-def protocolHooksVersion = "1.1"
+def protocolHooksVersion = "1.2"
 
 if (project.hasProperty("overrideGameVersion"))
 	gameVersion = project.getProperty("overrideGameVersion")

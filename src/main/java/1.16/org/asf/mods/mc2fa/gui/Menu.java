@@ -1,12 +1,14 @@
 package org.asf.mods.mc2fa.gui;
 
 import java.util.ArrayList;
+import java.util.ConcurrentModificationException;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 import modkit.enhanced.player.EnhancedPlayer;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.protocol.game.ClientboundContainerClosePacket;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.SimpleMenuProvider;
@@ -103,6 +105,18 @@ public class Menu extends ChestMenu {
 	public void attachOnClick(Function<ClickEvent, Integer> handler) {
 		handlers.add(handler);
 	}
+
+	public static void initServer(MinecraftServer server) {
+		server.addTickable(() -> {
+			try {
+				if (tickTasks.size() > 0)
+					tickTasks.remove(0).run();
+			} catch (ConcurrentModificationException e) {
+			}
+		});
+	}
+
+	private static ArrayList<Runnable> tickTasks = new ArrayList<Runnable>();
 
 	@SuppressWarnings("resource")
 	public static void open(EnhancedPlayer player, int rows, String title, Consumer<Menu> callback) {

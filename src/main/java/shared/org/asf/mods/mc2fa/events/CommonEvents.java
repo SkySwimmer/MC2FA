@@ -1,7 +1,9 @@
 package org.asf.mods.mc2fa.events;
 
-import modkit.enhanced.events.objects.player.PlayerJoinEventObject;
-import modkit.enhanced.events.player.PlayerJoinEvent;
+import modkit.enhanced.events.objects.player.PlayerLoginEventObject;
+import modkit.enhanced.events.objects.server.ServerEventObject;
+import modkit.enhanced.events.player.PlayerLoginEvent;
+import modkit.enhanced.events.server.ServerStartupEvent;
 import modkit.enhanced.player.EnhancedPlayer;
 import modkit.events.network.ServerSideConnectedEvent;
 import modkit.events.objects.network.ServerConnectionEventObject;
@@ -14,6 +16,7 @@ import modkit.util.server.language.ClientLanguage;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -49,6 +52,11 @@ public class CommonEvents extends CyanComponent implements IEventListenerContain
 	private HashMap<String, String> cachedTokens = new HashMap<String, String>();
 	private HashMap<String, UserInfo> authenticatingUsers = new HashMap<String, UserInfo>();
 
+	@SimpleEvent(ServerStartupEvent.class)
+	public void startServer(ServerEventObject event) {
+		Menu.initServer(event.getServer());
+	}
+
 	private class UserInfo {
 		public String token;
 		public String realm;
@@ -69,29 +77,28 @@ public class CommonEvents extends CyanComponent implements IEventListenerContain
 		return url;
 	}
 
-	@SimpleEvent(value = PlayerJoinEvent.class, synchronize = true)
-	public void onJoin(PlayerJoinEventObject event) {
+	@SimpleEvent(value = PlayerLoginEvent.class, synchronize = true)
+	public void onJoin(PlayerLoginEventObject event) {
 		try {
-			event.getPlayer().setInvulnerable(false);
-
-			String msg = validate(event.getPlayer(), event.getPlayer().getUUID().toString(),
-					event.getPlayer().getDisplayName().getString());
+			String msg = validate(event.getPlayer().getId().toString(), event.getPlayer().getName());
 			if (msg != null) {
-				event.getPlayer().connection.disconnect(new TextComponent(msg));
+				event.setDisconnectMessage(new TextComponent(msg));
+				event.cancel();
 			}
 		} catch (IOException e) {
-			event.getPlayer().connection.disconnect(new TextComponent(Colors.LIGHT_RED + "ERROR:\n" + Colors.GOLD
+			event.setDisconnectMessage(new TextComponent(Colors.LIGHT_RED + "ERROR:\n" + Colors.GOLD
 					+ "Could not contact the CMD-R 2FA authentication service.\n\nPlease try again later."));
+			event.cancel();
 		}
 	}
 
-	public String validate(EnhancedPlayer player, String id, String name) throws IOException {
+	public String validate(String id, String name) throws IOException {
 		boolean reauthenticate = false;
 		String token = cachedTokens.getOrDefault(id, "undefined");
 
-		if (mod.getUsers().users.containsKey(player.getName().getString())) {
-			mod.getUsers().users.put(id, mod.getUsers().users.get(player.getName().getString()));
-			mod.getUsers().users.remove(player.getName().getString());
+		if (mod.getUsers().users.containsKey(name)) {
+			mod.getUsers().users.put(id, mod.getUsers().users.get(name));
+			mod.getUsers().users.remove(name);
 			mod.getUsers().writeAll();
 		}
 		if (!mod.getUsers().users.containsKey(id)) {
@@ -99,7 +106,7 @@ public class CommonEvents extends CyanComponent implements IEventListenerContain
 		} else {
 			User usr = mod.getUsers().users.get(id);
 			try {
-				reauth(usr.token, usr.username, player, usr.username, true);
+				reauth(null, usr.token, usr.username, id, name, usr.username, true);
 			} catch (IOException e) {
 				reauthenticate = true;
 			}
@@ -187,6 +194,7 @@ public class CommonEvents extends CyanComponent implements IEventListenerContain
 	@SuppressWarnings("resource")
 	@SimpleEvent(ServerSideConnectedEvent.class)
 	public void onJoin(ServerConnectionEventObject event) {
+		event.getPlayer().setInvulnerable(false);
 		EnhancedPlayer player = EnhancedPlayer.from(event.getPlayer());
 
 		if (authenticatingUsers.containsKey(player.getUUID().toString())) {
@@ -415,7 +423,9 @@ public class CommonEvents extends CyanComponent implements IEventListenerContain
 			String str = new String(strm.readAllBytes());
 			strm.close();
 
-			reauth(str, "initial", player, user.username, false);
+			reauth(t -> {
+				player.connection.disconnect(t);
+			}, str, "initial", player.getUUID().toString(), player.getName().getString(), user.username, false);
 		} catch (IOException e) {
 			keyboard(player, "Authorization code", "", c -> {
 				validate(c, player, user);
@@ -425,8 +435,8 @@ public class CommonEvents extends CyanComponent implements IEventListenerContain
 		}
 	}
 
-	private void reauth(String token, String user, EnhancedPlayer player, String lastuser, boolean throwError)
-			throws IOException {
+	private void reauth(Consumer<Component> disconnect, String token, String user, String id, String name,
+			String lastuser, boolean throwError) throws IOException {
 		if (token.equals("authorized-by-admin"))
 			return;
 
@@ -438,27 +448,26 @@ public class CommonEvents extends CyanComponent implements IEventListenerContain
 			User usr = new User();
 			usr.username = payload.get("username").getAsString();
 			usr.token = newToken;
-			usr.playername = player.getName().getString();
+			usr.playername = name;
 			usr.expiry = payload.get("exp").getAsLong();
 
-			mod.getUsers().users.put(player.getUUID().toString(), usr);
+			mod.getUsers().users.put(id, usr);
 			mod.getUsers().writeAll();
 
-			if (authenticatingUsers.containsKey(player.getUUID().toString()))
-				authenticatingUsers.remove(player.getUUID().toString());
-			if (cachedTokens.containsKey(player.getUUID().toString()))
-				cachedTokens.remove(player.getUUID().toString());
+			if (authenticatingUsers.containsKey(id))
+				authenticatingUsers.remove(id);
+			if (cachedTokens.containsKey(id))
+				cachedTokens.remove(id);
 			if (!throwError)
-				player.connection.disconnect(new TextComponent(mod.getMessageConfig().successMessage
-						.replace("@p", player.getDisplayName().getString()).replace("@d", usr.username)));
+				disconnect.accept(new TextComponent(
+						mod.getMessageConfig().successMessage.replace("@p", name).replace("@d", usr.username)));
 		} catch (IOException e) {
 			if (throwError)
 				throw e;
 
-			player.connection.disconnect(new TextComponent(Colors.LIGHT_RED + "ERROR:\n" + Colors.GOLD
+			disconnect.accept(new TextComponent(Colors.LIGHT_RED + "ERROR:\n" + Colors.GOLD
 					+ "Token refresh failure, please contact the server administrator."));
-			error("Token refresh failure! User: initial, Player: " + player.getName().getString()
-					+ ", Last Discord Profile: " + lastuser, e);
+			error("Token refresh failure! User: initial, Player: " + name + ", Last Discord Profile: " + lastuser, e);
 		}
 	}
 
