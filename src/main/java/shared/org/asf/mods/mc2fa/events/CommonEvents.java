@@ -29,7 +29,9 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -55,7 +57,16 @@ public class CommonEvents extends CyanComponent implements IEventListenerContain
 	@SimpleEvent(ServerStartupEvent.class)
 	public void startServer(ServerEventObject event) {
 		Menu.initServer(event.getServer());
+		event.getServer().addTickable(() -> {
+			try {
+				if (tickTasks.size() > 0)
+					tickTasks.remove(0).run();
+			} catch (ConcurrentModificationException e) {
+			}
+		});
 	}
+
+	private static ArrayList<Runnable> tickTasks = new ArrayList<Runnable>();
 
 	private class UserInfo {
 		public String token;
@@ -227,7 +238,7 @@ public class CommonEvents extends CyanComponent implements IEventListenerContain
 							|| stop) {
 						i++;
 						if (i == 100) {
-							player.connection.disconnect(new TextComponent("Disconnected"));
+							tickTasks.add(() -> player.connection.disconnect(new TextComponent("Disconnected")));
 
 							try {
 								URL u = new URL(buildURL(mod.getEndpoints().logoutSessionEndpoint,

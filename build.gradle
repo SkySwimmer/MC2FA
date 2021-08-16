@@ -25,7 +25,7 @@ apply from: 'asf.mvn.publish.gradle'
 
 // Project information
 group="org.asf.mods"
-version="1.0.0.A12"
+version="1.0.0.A13"
 
 // Automatically assigned
 def mod_id = "mc2fa"
